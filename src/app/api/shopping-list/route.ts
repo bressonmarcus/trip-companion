@@ -10,6 +10,7 @@ const supabase = createClient(
 );
 
 type GeneratedItem = { name: string; quantity: string; category: "fresh" | "pantry" };
+type StoredItem = { name: string; quantity: string; category: "fresh" | "pantry" | "personal"; checked: boolean; addedBy?: string };
 type Loadout = { protein: string[]; sides: string[]; salad: string[]; sauce: string[]; other: string[] };
 
 const CATEGORY_LABELS: Record<keyof Loadout, string> = {
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     const message = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
+      max_tokens: 4096,
       system:
         "You are a precise grocery shopping list generator for home cooking. The user gives you a meal's " +
         "\"loadout\" organized by category (protein, sides, salad, sauce, other). Items within a category are " +
@@ -54,7 +55,9 @@ export async function POST(req: NextRequest) {
         "pepper, garlic, vinegar, etc.) as separate checklist items marked category 'pantry', so the cook can " +
         "check off what they already have stocked, versus fresh ingredients that need buying marked category " +
         '"fresh". Respond with ONLY valid JSON, no markdown fences, no commentary, in exactly this shape: ' +
-        '{"items":[{"name":string,"quantity":string,"category":"fresh"|"pantry"}]}',
+        '{"items":[{"name":string,"quantity":string,"category":"fresh"|"pantry"}]}. ' +
+        "Keep the JSON compact with no extra commentary before or after it.",
+
       messages: [
         {
           role: "user",
@@ -77,10 +80,35 @@ export async function POST(req: NextRequest) {
         .trim();
       parsed = JSON.parse(cleaned);
     } catch {
-      return NextResponse.json({ error: "Could not parse the generated list. Try again." }, { status: 500 });
+      // The model occasionally wraps the JSON in stray text or gets cut off mid-object.
+      // Try to salvage the outermost {...} block before giving up.
+      const match = textBlock.text.match(/\{[\s\S]*\}/);
+      if (!match) {
+        console.error("Unparseable shopping-list response:", textBlock.text);
+        return NextResponse.json({ error: "Could not parse the generated list. Try again." }, { status: 500 });
+      }
+      try {
+        parsed = JSON.parse(match[0]);
+      } catch {
+        console.error("Unparseable shopping-list response:", textBlock.text);
+        return NextResponse.json({ error: "Could not parse the generated list. Try again." }, { status: 500 });
+      }
     }
 
-    const items = parsed.items.map((item) => ({ ...item, checked: false }));
+    const generatedItems = parsed.items.map((item) => ({ ...item, checked: false }));
+
+    // Preserve any manually-added personal items across regenerations — only the
+    // AI-generated fresh/pantry portion gets replaced.
+    const { data: existing } = await supabase
+      .from("shopping_lists")
+      .select("generated_ingredients")
+      .eq("meal_id", mealId)
+      .maybeSingle();
+    const existingItems =
+      (existing?.generated_ingredients as { items?: StoredItem[] } | null)?.items ?? [];
+    const personalItems = existingItems.filter((item) => item.category === "personal");
+
+    const items = [...personalItems, ...generatedItems];
 
     await supabase
       .from("shopping_lists")

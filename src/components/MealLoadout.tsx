@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import CategoryEditor from "./CategoryEditor";
 
 type Person = { id: string; name: string };
 export type Loadout = {
@@ -15,19 +16,12 @@ export type Loadout = {
 const EMPTY_LOADOUT: Loadout = { protein: [], sides: [], salad: [], sauce: [], other: [] };
 
 const CATEGORIES: { key: keyof Loadout; label: string; placeholder: string }[] = [
-  { key: "protein", label: "Protein", placeholder: "Ribeye steak\nSoy-ginger marinade" },
-  { key: "sides", label: "Sides", placeholder: "Roasted potatoes\nGrilled corn" },
-  { key: "salad", label: "Salad", placeholder: "Greek salad" },
-  { key: "sauce", label: "Sauce", placeholder: "Garlic aioli" },
-  { key: "other", label: "Other", placeholder: "Crusty bread" },
+  { key: "protein", label: "Protein", placeholder: "e.g. Ribeye steak" },
+  { key: "sides", label: "Sides", placeholder: "e.g. Grilled corn" },
+  { key: "salad", label: "Salad", placeholder: "e.g. Greek salad" },
+  { key: "sauce", label: "Sauce", placeholder: "e.g. Garlic aioli" },
+  { key: "other", label: "Other", placeholder: "e.g. Crusty bread" },
 ];
-
-function loadoutToText(items: string[]) {
-  return items.join("\n");
-}
-function textToLoadout(text: string) {
-  return text.split("\n").map((s) => s.trim()).filter(Boolean);
-}
 
 export default function MealLoadout({
   mealId,
@@ -79,6 +73,10 @@ export default function MealLoadout({
     await supabase.from("meals").update({ loadout: next }).eq("id", mealId);
   }
 
+  function updateCategory(key: keyof Loadout, items: string[]) {
+    saveLoadout({ ...loadout, [key]: items });
+  }
+
   async function toggle(personId: string) {
     const next = !statuses[personId];
     setStatuses((prev) => ({ ...prev, [personId]: next }));
@@ -92,7 +90,7 @@ export default function MealLoadout({
 
   async function handleProceed() {
     if (!hasAnyItems) {
-      setError("Add at least one item to the loadout first.");
+      setError("Add at least one item to the meal first.");
       return;
     }
     setError(null);
@@ -150,22 +148,20 @@ export default function MealLoadout({
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 border rounded-lg p-5">
-        <h2 className="font-medium">Loadout</h2>
+      <div className="flex flex-col gap-5 border rounded-lg p-5">
+        <h2 className="font-medium">Meal</h2>
         <p className="text-sm text-gray-500">
-          Add what you&apos;re making, one item per line. A protein box can have more than just the protein itself —
-          add the marinade as its own line too.
+          Press + to add something to a category. A protein can be more than just the protein itself — add the
+          marinade as its own item too.
         </p>
         {CATEGORIES.map(({ key, label: catLabel, placeholder }) => (
-          <div key={key} className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">{catLabel}</label>
-            <textarea
-              className="border rounded px-3 py-2 h-20"
-              placeholder={placeholder}
-              defaultValue={loadoutToText(loadout[key])}
-              onBlur={(e) => saveLoadout({ ...loadout, [key]: textToLoadout(e.target.value) })}
-            />
-          </div>
+          <CategoryEditor
+            key={key}
+            label={catLabel}
+            items={loadout[key]}
+            placeholder={placeholder}
+            onChange={(items) => updateCategory(key, items)}
+          />
         ))}
       </div>
 
