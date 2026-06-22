@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import MealDetail from "./MealDetail";
+import MealLoadout from "./MealLoadout";
 
 type Person = { id: string; name: string };
 type Meal = { id: string; date: string; label: string | null };
@@ -66,7 +66,7 @@ export default function MealsList({ tripId, people }: { tripId: string; people: 
 
   if (openMealId !== null) {
     return (
-      <MealDetail
+      <MealLoadout
         mealId={openMealId}
         people={people}
         onBack={() => {
@@ -80,7 +80,7 @@ export default function MealsList({ tripId, people }: { tripId: string; people: 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-medium">Shopping / meals</h2>
+        <h2 className="font-medium">Meals</h2>
         {!creating && (
           <button onClick={() => setCreating(true)} className="bg-black text-white rounded px-3 py-1 text-sm">
             + New
