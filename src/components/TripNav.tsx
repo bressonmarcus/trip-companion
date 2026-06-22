@@ -26,7 +26,7 @@ export default function TripNav({
   const base = `/trip/${params.code}`;
 
   return (
-    <header className="border-b bg-white sticky top-0 z-10">
+    <header className="border-b bg-white text-gray-900 sticky top-0 z-10">
       <div className="max-w-lg mx-auto w-full px-6 pt-4 flex items-center justify-between">
         <span className="font-semibold text-sm truncate">{tripName}</span>
         <div className="flex items-center gap-3 text-xs text-gray-500">

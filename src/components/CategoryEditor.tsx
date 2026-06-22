@@ -95,7 +95,8 @@ export default function CategoryEditor({
               }}
             />
             {suggestions.length > 0 && (
-              <div className="absolute left-0 top-full mt-1 w-56 border rounded-lg bg-white shadow-md z-20 overflow-hidden">
+              <div className="absolute left-0 top-full mt-1 w-56 border rounded-lg bg-white text-gray-900 shadow-md z-20 overflow-hidden">
+                <p className="px-3 pt-2 pb-1 text-xs text-gray-400 italic">Suggested dishes — just ideas</p>
                 {suggestions.map((s) => (
                   <button
                     key={s}
@@ -104,7 +105,7 @@ export default function CategoryEditor({
                       e.preventDefault();
                       confirmAdd(s);
                     }}
-                    className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                    className="block w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-gray-100"
                   >
                     {s}
                   </button>
