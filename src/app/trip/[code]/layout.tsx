@@ -49,7 +49,11 @@ export default function TripLayout({ children }: { children: React.ReactNode }) 
   }
 
   async function loadPeople(tripId: string) {
-    const { data } = await supabase.from("people").select("id, name, claimed").eq("trip_id", tripId).order("name");
+    const { data } = await supabase
+      .from("people")
+      .select("id, name, claimed, avatar_url")
+      .eq("trip_id", tripId)
+      .order("name");
     setPeople(data ?? []);
   }
 
@@ -111,7 +115,15 @@ export default function TripLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <TripContext.Provider
-      value={{ trip, people, personId, refreshPeople: () => loadPeople(trip.id), switchPerson, isAdmin }}
+      value={{
+        trip,
+        people,
+        personId,
+        refreshPeople: () => loadPeople(trip.id),
+        refreshTrip: reloadTrip,
+        switchPerson,
+        isAdmin,
+      }}
     >
       <div className="min-h-screen flex flex-col">
         <TripNav tripName={trip.name} meName={me.name} onSwitchPerson={switchPerson} onSwitchTrip={switchTrip} />
