@@ -80,6 +80,7 @@ export default function ExpenseReviewForm({
         expense_date: date.trim() || null,
         total_amount: finalTotal,
         source: initial ? "scan" : "manual",
+        receipt_image_url: initial?.imageUrl ?? null,
       })
       .select()
       .single();
@@ -118,6 +119,11 @@ export default function ExpenseReviewForm({
   return (
     <div className="flex flex-col gap-4 border rounded-lg p-5">
       <h2 className="font-medium">{initial ? "Review scanned receipt" : "Add expense manually"}</h2>
+
+      {initial?.imageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={initial.imageUrl} alt="Receipt" className="rounded border max-h-64 object-contain self-start" />
+      )}
 
       {mismatch && (
         <div className="bg-amber-50 border border-amber-300 rounded p-3 text-sm text-amber-800">

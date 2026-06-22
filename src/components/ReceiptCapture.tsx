@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 export type ScanResult = {
   merchant: string | null;
@@ -9,9 +10,16 @@ export type ScanResult = {
   itemsSum: number;
   mismatch: boolean;
   mismatchDiff: number;
+  imageUrl: string | null;
 };
 
-export default function ReceiptCapture({ onScanned }: { onScanned: (result: ScanResult) => void }) {
+export default function ReceiptCapture({
+  tripId,
+  onScanned,
+}: {
+  tripId: string;
+  onScanned: (result: ScanResult) => void;
+}) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,17 +31,19 @@ export default function ReceiptCapture({ onScanned }: { onScanned: (result: Scan
     setLoading(true);
     try {
       const { base64, mediaType } = await fileToBase64(file);
-      const res = await fetch("/api/receipts/scan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: base64, mediaType }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Could not read this receipt.");
+      const [scanRes, imageUrl] = await Promise.all([
+        fetch("/api/receipts/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageBase64: base64, mediaType }),
+        }).then((res) => res.json().then((json) => ({ ok: res.ok, json }))),
+        uploadReceiptImage(tripId, file),
+      ]);
+      if (!scanRes.ok) {
+        setError(scanRes.json.error ?? "Could not read this receipt.");
         return;
       }
-      onScanned(json);
+      onScanned({ ...scanRes.json, imageUrl });
     } catch {
       setError("Something went wrong reading the receipt.");
     } finally {
@@ -75,4 +85,23 @@ function fileToBase64(file: File): Promise<{ base64: string; mediaType: string }
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+async function uploadReceiptImage(tripId: string, file: File): Promise<string | null> {
+  try {
+    const ext = (file.type.split("/")[1] || "jpg").replace("jpeg", "jpg");
+    const path = `${tripId}/${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage.from("receipts").upload(path, file, {
+      contentType: file.type || "image/jpeg",
+    });
+    if (error) {
+      console.error("Receipt image upload failed:", error.message);
+      return null;
+    }
+    const { data } = supabase.storage.from("receipts").getPublicUrl(path);
+    return data.publicUrl;
+  } catch (err) {
+    console.error("Receipt image upload failed:", err);
+    return null;
+  }
 }

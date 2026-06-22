@@ -14,6 +14,7 @@ type ExpenseRow = {
   payer_id: string;
   source: string;
   created_at: string;
+  receipt_image_url: string | null;
 };
 
 export default function ReceiptsPage() {
@@ -84,6 +85,7 @@ export default function ReceiptsPage() {
       <div className="flex gap-2">
         <div className="flex-1">
           <ReceiptCapture
+            tripId={trip.id}
             onScanned={(result) => {
               setScanResult(result);
               setMode("review");
@@ -102,15 +104,32 @@ export default function ReceiptsPage() {
           <p className="text-sm text-gray-400">No expenses logged yet — scan a receipt or add one manually.</p>
         )}
         {expenses.map((e) => (
-          <div key={e.id} className="border rounded-lg p-4 flex items-center justify-between">
-            <div>
-              <p className="font-medium text-sm">{e.merchant || e.description}</p>
-              <p className="text-xs text-gray-500">
-                Paid by {personName(e.payer_id)}
-                {e.expense_date ? ` · ${e.expense_date}` : ""}
-              </p>
+          <div key={e.id} className="border rounded-lg p-4 flex items-center gap-3">
+            {e.receipt_image_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={e.receipt_image_url}
+                alt="Receipt"
+                className="w-12 h-12 object-cover rounded border flex-shrink-0"
+              />
+            )}
+            <div className="flex-1 flex items-center justify-between">
+              <div>
+                <p className="font-medium text-sm">{e.merchant || e.description}</p>
+                <p className="text-xs text-gray-500">
+                  Paid by {personName(e.payer_id)}
+                  {e.expense_date ? ` · ${e.expense_date}` : ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <p className="font-medium text-sm">{Number(e.total_amount).toFixed(2)} kr</p>
+                {e.receipt_image_url && (
+                  <a href={e.receipt_image_url} target="_blank" rel="noreferrer" className="text-xs underline text-gray-500">
+                    View photo
+                  </a>
+                )}
+              </div>
             </div>
-            <p className="font-medium text-sm">{Number(e.total_amount).toFixed(2)} kr</p>
           </div>
         ))}
       </div>
