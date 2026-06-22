@@ -10,7 +10,7 @@ const supabase = createClient(
 );
 
 type GeneratedItem = { name: string; quantity: string; category: "fresh" | "pantry" };
-type StoredItem = { name: string; quantity: string; category: "fresh" | "pantry" | "personal"; checked: boolean; addedBy?: string };
+type StoredItem = { name: string; quantity: string; category: "fresh" | "pantry" | "personal"; checked: boolean; sharedBy?: string[] };
 type Loadout = { protein: string[]; sides: string[]; salad: string[]; sauce: string[]; other: string[] };
 
 const CATEGORY_LABELS: Record<keyof Loadout, string> = {

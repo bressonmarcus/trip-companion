@@ -9,7 +9,7 @@ type Item = {
   quantity: string;
   category: "fresh" | "pantry" | "personal";
   checked: boolean;
-  addedBy?: string;
+  sharedBy?: string[];
 };
 
 const CATEGORY_LABELS: { key: keyof Loadout; label: string }[] = [
@@ -36,6 +36,7 @@ export default function ShoppingList({
   const [error, setError] = useState<string | null>(null);
   const [personalName, setPersonalName] = useState("");
   const [personalQty, setPersonalQty] = useState("");
+  const [personalSharers, setPersonalSharers] = useState<string[]>([personId]);
 
   useEffect(() => {
     loadExisting();
@@ -96,13 +97,19 @@ export default function ShoppingList({
     e.preventDefault();
     const name = personalName.trim();
     if (!name) return;
+    const sharedBy = personalSharers.length > 0 ? personalSharers : [personId];
     const next: Item[] = [
       ...items,
-      { name, quantity: personalQty.trim() || "1", category: "personal", checked: false, addedBy: personId },
+      { name, quantity: personalQty.trim() || "1", category: "personal", checked: false, sharedBy },
     ];
     setPersonalName("");
     setPersonalQty("");
+    setPersonalSharers([personId]);
     persistItems(next);
+  }
+
+  function toggleSharer(id: string) {
+    setPersonalSharers((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
   }
 
   function removeItem(index: number) {
@@ -118,6 +125,11 @@ export default function ShoppingList({
 
   function nameFor(personIdValue?: string) {
     return people.find((p) => p.id === personIdValue)?.name ?? "Someone";
+  }
+
+  function namesFor(ids?: string[]) {
+    if (!ids || ids.length === 0) return "Someone";
+    return ids.map((id) => nameFor(id)).join(" & ");
   }
 
   return (
@@ -202,7 +214,7 @@ export default function ShoppingList({
                 <input type="checkbox" checked={item.checked} onChange={() => toggleItem(index)} />
                 <span className={`flex-1 ${item.checked ? "line-through text-gray-400" : ""}`}>
                   {item.name} <span className="text-gray-500">— {item.quantity}</span>{" "}
-                  <span className="text-gray-400">({nameFor(item.addedBy)})</span>
+                  <span className="text-gray-400">({namesFor(item.sharedBy)})</span>
                 </span>
                 <button
                   type="button"
@@ -217,20 +229,40 @@ export default function ShoppingList({
           })}
         </div>
 
-        <form onSubmit={addPersonalItem} className="flex gap-2">
-          <input
-            className="border rounded px-3 py-2 flex-1 text-sm"
-            placeholder="e.g. Monster energy drinks"
-            value={personalName}
-            onChange={(e) => setPersonalName(e.target.value)}
-          />
-          <input
-            className="border rounded px-3 py-2 w-20 text-sm"
-            placeholder="qty"
-            value={personalQty}
-            onChange={(e) => setPersonalQty(e.target.value)}
-          />
-          <button className="bg-gray-200 rounded px-3 text-sm">Add</button>
+        <form onSubmit={addPersonalItem} className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input
+              className="border rounded px-3 py-2 flex-1 text-sm"
+              placeholder="e.g. Monster energy drinks"
+              value={personalName}
+              onChange={(e) => setPersonalName(e.target.value)}
+            />
+            <input
+              className="border rounded px-3 py-2 w-20 text-sm"
+              placeholder="qty"
+              value={personalQty}
+              onChange={(e) => setPersonalQty(e.target.value)}
+            />
+            <button className="bg-gray-200 rounded px-3 text-sm">Add</button>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            <span className="text-xs text-gray-400 mr-1 self-center">Splitting between:</span>
+            {people.map((p) => {
+              const active = personalSharers.includes(p.id);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => toggleSharer(p.id)}
+                  className={`text-xs rounded-full px-2 py-1 border ${
+                    active ? "bg-black text-white border-black" : "text-gray-500 border-gray-300"
+                  }`}
+                >
+                  {p.name}
+                </button>
+              );
+            })}
+          </div>
         </form>
       </div>
     </div>
