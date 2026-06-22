@@ -1,15 +1,18 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import MealForm from "./MealForm";
+import MealDetail from "./MealDetail";
 
 type Person = { id: string; name: string };
 type Meal = { id: string; date: string; label: string | null };
 
 export default function MealsList({ tripId, people }: { tripId: string; people: Person[] }) {
   const [meals, setMeals] = useState<(Meal & { inCount: number })[] | null>(null);
-  const [editingMealId, setEditingMealId] = useState<string | null>(null);
+  const [openMealId, setOpenMealId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [newDate, setNewDate] = useState(new Date().toISOString().slice(0, 10));
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     loadMeals();
@@ -36,31 +39,38 @@ export default function MealsList({ tripId, people }: { tripId: string; people: 
     setMeals((mealRows ?? []).map((m) => ({ ...m, inCount: inCounts.get(m.id) ?? people.length })));
   }
 
-  if (meals === null) return <p>Loading meals...</p>;
-
-  if (creating) {
-    return (
-      <MealForm
-        tripId={tripId}
-        people={people}
-        existingMeal={null}
-        onDone={() => {
-          setCreating(false);
-          loadMeals();
-        }}
-      />
-    );
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setCreateError(null);
+    const { data, error } = await supabase
+      .from("meals")
+      .insert({ trip_id: tripId, date: newDate, type: "dinner", label: newLabel || null })
+      .select()
+      .single();
+    if (error || !data) {
+      setCreateError(error?.message ?? "Could not create meal.");
+      return;
+    }
+    await supabase
+      .from("attendance")
+      .upsert(people.map((p) => ({ meal_id: data.id, person_id: p.id, status: "in" })), {
+        onConflict: "meal_id,person_id",
+      });
+    setCreating(false);
+    setNewLabel("");
+    await loadMeals();
+    setOpenMealId(data.id);
   }
 
-  if (editingMealId !== null) {
-    const meal = meals.find((m) => m.id === editingMealId) ?? null;
+  if (meals === null) return <p>Loading meals...</p>;
+
+  if (openMealId !== null) {
     return (
-      <MealForm
-        tripId={tripId}
+      <MealDetail
+        mealId={openMealId}
         people={people}
-        existingMeal={meal}
-        onDone={() => {
-          setEditingMealId(null);
+        onBack={() => {
+          setOpenMealId(null);
           loadMeals();
         }}
       />
@@ -71,12 +81,38 @@ export default function MealsList({ tripId, people }: { tripId: string; people: 
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="font-medium">Shopping / meals</h2>
-        <button onClick={() => setCreating(true)} className="bg-black text-white rounded px-3 py-1 text-sm">
-          + New
-        </button>
+        {!creating && (
+          <button onClick={() => setCreating(true)} className="bg-black text-white rounded px-3 py-1 text-sm">
+            + New
+          </button>
+        )}
       </div>
 
-      {meals.length === 0 && (
+      {creating && (
+        <form onSubmit={handleCreate} className="flex flex-col gap-3 border rounded-lg p-5">
+          <input
+            className="border rounded px-3 py-2"
+            placeholder="Label (e.g. Day 3 dinner)"
+            value={newLabel}
+            onChange={(e) => setNewLabel(e.target.value)}
+          />
+          <input
+            type="date"
+            className="border rounded px-3 py-2"
+            value={newDate}
+            onChange={(e) => setNewDate(e.target.value)}
+          />
+          {createError && <p className="text-red-600 text-sm">{createError}</p>}
+          <div className="flex gap-2">
+            <button className="bg-black text-white rounded py-2 px-4">Create</button>
+            <button type="button" onClick={() => setCreating(false)} className="bg-gray-200 rounded py-2 px-4">
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {meals.length === 0 && !creating && (
         <p className="text-sm text-gray-500">No meals planned yet — add one to set who&apos;s in.</p>
       )}
 
@@ -84,7 +120,7 @@ export default function MealsList({ tripId, people }: { tripId: string; people: 
         {meals.map((meal) => (
           <button
             key={meal.id}
-            onClick={() => setEditingMealId(meal.id)}
+            onClick={() => setOpenMealId(meal.id)}
             className="flex items-center justify-between border rounded-lg px-4 py-3 text-left hover:bg-gray-50"
           >
             <div>
