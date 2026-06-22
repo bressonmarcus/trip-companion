@@ -1,38 +1,14 @@
 "use client";
-import { useState } from "react";
-import { supabase } from "@/lib/supabase";
 
-type Person = { id: string; name: string };
+type Person = { id: string; name: string; claimed: boolean };
 
 export default function PersonPicker({
   people,
   onChosen,
-  onAddPerson,
-  tripId,
 }: {
   people: Person[];
   onChosen: (id: string) => void;
-  onAddPerson: () => void;
-  tripId: string;
 }) {
-  const [newName, setNewName] = useState("");
-  const [adding, setAdding] = useState(false);
-
-  async function handleAddNew(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newName.trim()) return;
-    setAdding(true);
-    const { data } = await supabase
-      .from("people")
-      .insert({ trip_id: tripId, name: newName.trim() })
-      .select()
-      .single();
-    setAdding(false);
-    setNewName("");
-    onAddPerson();
-    if (data) onChosen(data.id);
-  }
-
   return (
     <div className="flex flex-col gap-3 border rounded-lg p-5">
       <h2 className="font-medium">Who are you?</h2>
@@ -42,23 +18,14 @@ export default function PersonPicker({
           <button
             key={p.id}
             onClick={() => onChosen(p.id)}
-            className="border rounded py-2 text-left px-3 hover:bg-gray-100"
+            className={`border rounded py-2 text-left px-3 hover:bg-gray-100 ${p.claimed ? "bg-gray-50" : ""}`}
           >
-            {p.name}
+            <span className={p.claimed ? "text-gray-400" : ""}>{p.name}</span>
+            {p.claimed && <span className="block text-xs text-gray-400">Already picked — tap again if this is you</span>}
           </button>
         ))}
       </div>
-      <form onSubmit={handleAddNew} className="flex gap-2 mt-2">
-        <input
-          className="border rounded px-3 py-2 flex-1"
-          placeholder="Not on the list? Add your name"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-        />
-        <button disabled={adding} className="bg-gray-200 rounded px-3">
-          {adding ? "..." : "Add"}
-        </button>
-      </form>
+      <p className="text-xs text-gray-400 mt-1">Don&apos;t see your name? Ask whoever set up the trip to add you.</p>
     </div>
   );
 }

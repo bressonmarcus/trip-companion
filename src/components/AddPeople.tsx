@@ -15,12 +15,25 @@ export default function AddPeople({ tripId, onAdded }: { tripId: string; onAdded
       return;
     }
     setLoading(true);
-    const { error } = await supabase.from("people").insert(list.map((name) => ({ trip_id: tripId, name })));
-    setLoading(false);
+    const { data, error } = await supabase
+      .from("people")
+      .insert(list.map((name) => ({ trip_id: tripId, name })))
+      .select();
     if (error) {
+      setLoading(false);
       setError(error.message);
       return;
     }
+    // Whoever sets up the trip's first roster becomes the admin — only set
+    // once, never overwritten on later additions.
+    if (data && data.length > 0) {
+      await supabase
+        .from("trips")
+        .update({ admin_person_id: data[0].id })
+        .eq("id", tripId)
+        .is("admin_person_id", null);
+    }
+    setLoading(false);
     onAdded();
   }
 

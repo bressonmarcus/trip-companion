@@ -7,6 +7,7 @@ import PersonPicker from "@/components/PersonPicker";
 import TripNav from "@/components/TripNav";
 import { TripContext } from "@/lib/trip-context";
 import type { Trip, Person } from "@/lib/trip-context";
+import { rememberTrip } from "@/lib/recent-trips";
 
 export default function TripLayout({ children }: { children: React.ReactNode }) {
   const params = useParams<{ code: string }>();
@@ -36,14 +37,19 @@ export default function TripLayout({ children }: { children: React.ReactNode }) 
       return;
     }
     setTrip(data);
-    localStorage.setItem("trip-companion:lastTripCode", data.code);
+    rememberTrip(data.code, data.name);
     const stored = localStorage.getItem(`trip-companion:${data.code}:personId`);
     if (stored) setPersonId(stored);
     await loadPeople(data.id);
   }
 
+  async function reloadTrip() {
+    const { data } = await supabase.from("trips").select("*").eq("id", trip?.id).maybeSingle();
+    if (data) setTrip(data);
+  }
+
   async function loadPeople(tripId: string) {
-    const { data } = await supabase.from("people").select("id, name").eq("trip_id", tripId).order("name");
+    const { data } = await supabase.from("people").select("id, name, claimed").eq("trip_id", tripId).order("name");
     setPeople(data ?? []);
   }
 
@@ -51,10 +57,11 @@ export default function TripLayout({ children }: { children: React.ReactNode }) 
     if (!trip) return;
     localStorage.setItem(`trip-companion:${trip.code}:personId`, id);
     setPersonId(id);
+    setPeople((prev) => (prev ? prev.map((p) => (p.id === id ? { ...p, claimed: true } : p)) : prev));
+    supabase.from("people").update({ claimed: true }).eq("id", id);
   }
 
   function switchTrip() {
-    localStorage.removeItem("trip-companion:lastTripCode");
     router.push("/");
   }
 
@@ -79,7 +86,13 @@ export default function TripLayout({ children }: { children: React.ReactNode }) 
     return (
       <main className="min-h-screen p-6 max-w-lg mx-auto flex flex-col gap-6">
         <TripHeader trip={trip} />
-        <AddPeople tripId={trip.id} onAdded={() => loadPeople(trip.id)} />
+        <AddPeople
+          tripId={trip.id}
+          onAdded={async () => {
+            await reloadTrip();
+            await loadPeople(trip.id);
+          }}
+        />
       </main>
     );
   }
@@ -89,13 +102,17 @@ export default function TripLayout({ children }: { children: React.ReactNode }) 
     return (
       <main className="min-h-screen p-6 max-w-lg mx-auto flex flex-col gap-6">
         <TripHeader trip={trip} />
-        <PersonPicker people={people} onChosen={handlePersonChosen} onAddPerson={() => loadPeople(trip.id)} tripId={trip.id} />
+        <PersonPicker people={people} onChosen={handlePersonChosen} />
       </main>
     );
   }
 
+  const isAdmin = personId === trip.admin_person_id;
+
   return (
-    <TripContext.Provider value={{ trip, people, personId, refreshPeople: () => loadPeople(trip.id), switchPerson }}>
+    <TripContext.Provider
+      value={{ trip, people, personId, refreshPeople: () => loadPeople(trip.id), switchPerson, isAdmin }}
+    >
       <div className="min-h-screen flex flex-col">
         <TripNav tripName={trip.name} meName={me.name} onSwitchPerson={switchPerson} onSwitchTrip={switchTrip} />
         <div className="max-w-lg mx-auto w-full p-6 flex-1">{children}</div>
