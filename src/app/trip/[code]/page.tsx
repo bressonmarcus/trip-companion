@@ -1,45 +1,30 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-import TripView from "@/components/TripView";
+import { useTripContext } from "@/lib/trip-context";
 
-type Trip = {
-  id: string;
-  name: string;
-  code: string;
-  start_date: string;
-  end_date: string;
-};
+export default function TripOverviewPage() {
+  const { trip, people } = useTripContext();
 
-export default function TripPage() {
-  const params = useParams<{ code: string }>();
-  const [trip, setTrip] = useState<Trip | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="border rounded-lg p-5 flex flex-col gap-2">
+        <h2 className="font-medium">Trip details</h2>
+        <p className="text-sm text-gray-600">
+          {new Date(trip.start_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} –{" "}
+          {new Date(trip.end_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+        </p>
+        <p className="text-sm text-gray-500">
+          Code: <span className="font-mono">{trip.code}</span>
+        </p>
+      </div>
 
-  useEffect(() => {
-    async function loadTrip() {
-      const { data, error } = await supabase
-        .from("trips")
-        .select("*")
-        .eq("code", params.code.toUpperCase())
-        .maybeSingle();
-      if (error) {
-        setError(error.message);
-      } else if (!data) {
-        setError("No trip found with that code.");
-      } else {
-        setTrip(data);
-      }
-      setLoading(false);
-    }
-    loadTrip();
-  }, [params.code]);
-
-  if (loading) return <main className="p-6">Loading...</main>;
-  if (error) return <main className="p-6 text-red-600">{error}</main>;
-  if (!trip) return null;
-
-  return <TripView trip={trip} />;
+      <div className="border rounded-lg p-5">
+        <h2 className="font-medium mb-2">People ({people.length})</h2>
+        <ul className="flex flex-col gap-1 text-sm text-gray-700">
+          {people.map((p) => (
+            <li key={p.id}>{p.name}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
 }

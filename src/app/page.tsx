@@ -1,17 +1,27 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { generateTripCode } from "@/lib/tripcode";
 
 export default function Home() {
   const router = useRouter();
+  const [checkingStored, setCheckingStored] = useState(true);
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("trip-companion:lastTripCode");
+    if (stored) {
+      router.replace(`/trip/${stored}`);
+    } else {
+      setCheckingStored(false);
+    }
+  }, [router]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -40,6 +50,14 @@ export default function Home() {
     e.preventDefault();
     if (!joinCode) return;
     router.push(`/trip/${joinCode.trim().toUpperCase()}`);
+  }
+
+  if (checkingStored) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <p className="text-sm text-gray-500">Loading...</p>
+      </main>
+    );
   }
 
   return (
