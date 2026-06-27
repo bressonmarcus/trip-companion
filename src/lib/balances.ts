@@ -22,19 +22,30 @@ export type SettlePayment = {
   amount: number;
 };
 
+// A recorded settle-up: a batch of payments that have actually been made.
+export type SettlementForBalance = { payments: SettlePayment[] };
+
 // Net balance = (amount this person fronted as payer) - (amount of their own
-// consumption across all itemized expenses). Positive = they're owed money,
-// negative = they owe money.
+// consumption across all itemized expenses) + (settle-up payments already made).
+// Positive = they're owed money, negative = they owe money.
+//
+// Settlements must be included here: a recorded payment from A to B means A has
+// paid down their debt, so A's balance moves up and B's moves down by the same
+// amount. Leaving them out makes already-settled debt reappear every time the
+// balances are recomputed (the original "settle up does nothing" bug).
 export function computeNetBalances(
   people: BalancePerson[],
   expenses: ExpenseForBalance[],
-  items: ExpenseItemForBalance[]
+  items: ExpenseItemForBalance[],
+  settlements: SettlementForBalance[] = []
 ): NetBalance[] {
   const paid: Record<string, number> = {};
   const consumed: Record<string, number> = {};
+  const settled: Record<string, number> = {};
   for (const p of people) {
     paid[p.id] = 0;
     consumed[p.id] = 0;
+    settled[p.id] = 0;
   }
 
   for (const expense of expenses) {
@@ -52,11 +63,26 @@ export function computeNetBalances(
     }
   }
 
+  for (const settlement of settlements) {
+    for (const pay of settlement.payments ?? []) {
+      const amount = Number(pay.amount) || 0;
+      if (settled[pay.fromId] != null) settled[pay.fromId] += amount;
+      if (settled[pay.toId] != null) settled[pay.toId] -= amount;
+    }
+  }
+
   return people.map((p) => ({
     personId: p.id,
     name: p.name,
-    amount: Math.round((paid[p.id] - consumed[p.id]) * 100) / 100,
+    amount: Math.round((paid[p.id] - consumed[p.id] + settled[p.id]) * 100) / 100,
   }));
+}
+
+// A correct ledger always nets to zero. If it doesn't, some receipt's items
+// don't add up to its total (money was credited to a payer that nobody was
+// charged for, or vice-versa). Returns the signed imbalance, rounded.
+export function balanceImbalance(balances: NetBalance[]): number {
+  return Math.round(balances.reduce((sum, b) => sum + b.amount, 0) * 100) / 100;
 }
 
 // Greedy debt simplification: repeatedly match the biggest creditor with the

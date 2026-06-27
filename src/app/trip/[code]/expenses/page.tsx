@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useTripContext } from "@/lib/trip-context";
 import { supabase } from "@/lib/supabase";
-import { computeNetBalances, simplifyDebts, SettlePayment } from "@/lib/balances";
+import { computeNetBalances, simplifyDebts, balanceImbalance, SettlePayment } from "@/lib/balances";
 
 type ExpenseRow = { id: string; payer_id: string; total_amount: number };
 type ItemRow = { expense_id: string; price: number; shared_by: string[] };
@@ -43,9 +43,10 @@ export default function ExpensesPage() {
     setLoading(false);
   }
 
-  const balances = computeNetBalances(people, expenses, items);
+  const balances = computeNetBalances(people, expenses, items, settlements);
   const suggested = simplifyDebts(balances);
   const hasActivity = expenses.length > 0;
+  const imbalance = balanceImbalance(balances);
 
   async function handleSettleUp() {
     setError(null);
@@ -70,6 +71,17 @@ export default function ExpensesPage() {
 
   return (
     <div className="flex flex-col gap-5">
+      {hasActivity && Math.abs(imbalance) > 1 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 text-sm text-amber-800">
+          <p className="font-medium">These balances don&apos;t add up ({imbalance > 0 ? "+" : ""}{imbalance.toFixed(2)} kr off).</p>
+          <p className="mt-1">
+            One or more receipts have items that don&apos;t match their total, so the books can&apos;t balance.
+            Open the offending receipt in the <span className="font-medium">Receipts</span> tab and fix the prices
+            until the items add up to the total.
+          </p>
+        </div>
+      )}
+
       <div className="border rounded-lg p-5">
         <h2 className="font-medium mb-3">Balances</h2>
         {!hasActivity && <p className="text-sm text-gray-400">No expenses logged yet.</p>}

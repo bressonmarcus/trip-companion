@@ -192,7 +192,7 @@ export default function ManualShoppingList({ listId }: { listId: string }) {
             <button className="bg-gray-200 rounded px-3 text-sm">Add</button>
           </div>
           <div className="flex flex-wrap gap-1">
-            <span className="text-xs text-gray-400 mr-1 self-center">Splitting between:</span>
+            <span className="text-xs text-gray-600 mr-1 self-center">Splitting between:</span>
             {people.map((p) => {
               const active = personalSharers.includes(p.id);
               return (
@@ -201,7 +201,7 @@ export default function ManualShoppingList({ listId }: { listId: string }) {
                   type="button"
                   onClick={() => toggleSharer(p.id)}
                   className={`text-xs rounded-full px-2 py-1 border ${
-                    active ? "bg-black text-white border-black" : "text-gray-500 border-gray-300"
+                    active ? "bg-black text-white border-black" : "bg-white text-gray-700 border-gray-400"
                   }`}
                 >
                   {p.name}

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useTripContext } from "@/lib/trip-context";
 import { supabase } from "@/lib/supabase";
 import ReceiptCapture, { ScanResult } from "@/components/ReceiptCapture";
-import ExpenseReviewForm from "@/components/ExpenseReviewForm";
+import ExpenseReviewForm, { EditExpense } from "@/components/ExpenseReviewForm";
 
 type ExpenseRow = {
   id: string;
@@ -19,8 +19,9 @@ type ExpenseRow = {
 
 export default function ReceiptsPage() {
   const { trip, people, personId } = useTripContext();
-  const [mode, setMode] = useState<"list" | "scanning" | "manual" | "review">("list");
+  const [mode, setMode] = useState<"list" | "scanning" | "manual" | "review" | "edit">("list");
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [editExpense, setEditExpense] = useState<EditExpense | null>(null);
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -42,6 +43,27 @@ export default function ReceiptsPage() {
 
   function personName(id: string) {
     return people.find((p) => p.id === id)?.name ?? "Someone";
+  }
+
+  async function openExpense(e: ExpenseRow) {
+    const { data: itemData } = await supabase
+      .from("expense_items")
+      .select("name, price, shared_by")
+      .eq("expense_id", e.id);
+    setEditExpense({
+      id: e.id,
+      merchant: e.merchant,
+      date: e.expense_date,
+      total: Number(e.total_amount),
+      payerId: e.payer_id,
+      imageUrl: e.receipt_image_url,
+      items: (itemData ?? []).map((it) => ({
+        name: it.name,
+        price: Number(it.price),
+        sharedBy: (it.shared_by as string[]) ?? [],
+      })),
+    });
+    setMode("edit");
   }
 
   if (mode === "review" || (mode === "scanning" && scanResult)) {
@@ -80,6 +102,27 @@ export default function ReceiptsPage() {
     );
   }
 
+  if (mode === "edit" && editExpense) {
+    return (
+      <ExpenseReviewForm
+        tripId={trip.id}
+        people={people}
+        personId={personId}
+        initial={null}
+        edit={editExpense}
+        onSaved={() => {
+          setMode("list");
+          setEditExpense(null);
+          loadExpenses();
+        }}
+        onCancel={() => {
+          setMode("list");
+          setEditExpense(null);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex gap-2">
@@ -104,7 +147,19 @@ export default function ReceiptsPage() {
           <p className="text-sm text-gray-400">No expenses logged yet — scan a receipt or add one manually.</p>
         )}
         {expenses.map((e) => (
-          <div key={e.id} className="border rounded-lg p-4 flex items-center gap-3">
+          <div
+            key={e.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => openExpense(e)}
+            onKeyDown={(ev) => {
+              if (ev.key === "Enter" || ev.key === " ") {
+                ev.preventDefault();
+                openExpense(e);
+              }
+            }}
+            className="border rounded-lg p-4 flex items-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
+          >
             {e.receipt_image_url && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -124,10 +179,17 @@ export default function ReceiptsPage() {
               <div className="flex items-center gap-3">
                 <p className="font-medium text-sm">{Number(e.total_amount).toFixed(2)} kr</p>
                 {e.receipt_image_url && (
-                  <a href={e.receipt_image_url} target="_blank" rel="noreferrer" className="text-xs underline text-gray-500">
+                  <a
+                    href={e.receipt_image_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(ev) => ev.stopPropagation()}
+                    className="text-xs underline text-gray-500"
+                  >
                     View photo
                   </a>
                 )}
+                <span className="text-xs text-gray-400">Edit ›</span>
               </div>
             </div>
           </div>
